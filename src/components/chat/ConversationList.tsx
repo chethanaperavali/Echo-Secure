@@ -13,12 +13,22 @@ import {
   DialogTitle,
   DialogTrigger,
 } from '@/components/ui/dialog';
-import { MessageSquarePlus, Search, Shield, Loader2 } from 'lucide-react';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
+import { MessageSquarePlus, Search, Shield, Loader2, Trash2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 
 interface ConversationListProps {
   selectedConversation: string | null;
-  onSelectConversation: (id: string) => void;
+  onSelectConversation: (id: string | null) => void;
 }
 
 export function ConversationList({
@@ -26,10 +36,12 @@ export function ConversationList({
   onSelectConversation,
 }: ConversationListProps) {
   const { user } = useAuth();
-  const { conversations, isLoading, createConversation } = useConversations();
+  const { conversations, isLoading, createConversation, deleteConversation } = useConversations();
   const [searchQuery, setSearchQuery] = useState('');
   const [newUsername, setNewUsername] = useState('');
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [conversationToDelete, setConversationToDelete] = useState<string | null>(null);
   const { toast } = useToast();
 
   const handleCreateConversation = async () => {
@@ -50,6 +62,30 @@ export function ConversationList({
         description: error.message,
         variant: 'destructive',
       });
+    }
+  };
+
+  const handleDeleteConversation = async () => {
+    if (!conversationToDelete) return;
+
+    try {
+      await deleteConversation.mutateAsync(conversationToDelete);
+      if (selectedConversation === conversationToDelete) {
+        onSelectConversation(null);
+      }
+      toast({
+        title: 'Conversation deleted',
+        description: 'The conversation has been removed.',
+      });
+    } catch (error: any) {
+      toast({
+        title: 'Failed to delete conversation',
+        description: error.message,
+        variant: 'destructive',
+      });
+    } finally {
+      setDeleteDialogOpen(false);
+      setConversationToDelete(null);
     }
   };
 
@@ -148,37 +184,77 @@ export function ConversationList({
               const isSelected = selectedConversation === conversation.id;
 
               return (
-                <button
+                <div
                   key={conversation.id}
-                  onClick={() => onSelectConversation(conversation.id)}
-                  className={`w-full flex items-center gap-3 p-3 rounded-lg transition-colors text-left ${
+                  className={`group flex items-center gap-2 rounded-lg transition-colors ${
                     isSelected
                       ? 'bg-primary/10 text-primary'
                       : 'hover:bg-muted'
                   }`}
                 >
-                  <Avatar className="h-10 w-10">
-                    <AvatarFallback className={isSelected ? 'gradient-secure text-primary-foreground' : 'bg-secondary'}>
-                      {other.display_name?.[0] || other.username[0]}
-                    </AvatarFallback>
-                  </Avatar>
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2">
-                      <span className="font-medium truncate">
-                        {other.display_name || other.username}
-                      </span>
-                      <Shield className="w-3 h-3 text-primary flex-shrink-0" />
+                  <button
+                    onClick={() => onSelectConversation(conversation.id)}
+                    className="flex-1 flex items-center gap-3 p-3 text-left"
+                  >
+                    <Avatar className="h-10 w-10">
+                      <AvatarFallback className={isSelected ? 'gradient-secure text-primary-foreground' : 'bg-secondary'}>
+                        {other.display_name?.[0] || other.username[0]}
+                      </AvatarFallback>
+                    </Avatar>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2">
+                        <span className="font-medium truncate">
+                          {other.display_name || other.username}
+                        </span>
+                        <Shield className="w-3 h-3 text-primary flex-shrink-0" />
+                      </div>
+                      <p className="text-xs text-muted-foreground truncate">
+                        @{other.username}
+                      </p>
                     </div>
-                    <p className="text-xs text-muted-foreground truncate">
-                      @{other.username}
-                    </p>
-                  </div>
-                </button>
+                  </button>
+                  <Button
+                    size="icon"
+                    variant="ghost"
+                    className="h-8 w-8 mr-2 opacity-0 group-hover:opacity-100 transition-opacity text-muted-foreground hover:text-destructive"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setConversationToDelete(conversation.id);
+                      setDeleteDialogOpen(true);
+                    }}
+                  >
+                    <Trash2 className="w-4 h-4" />
+                  </Button>
+                </div>
               );
             })}
           </div>
         )}
       </ScrollArea>
+
+      {/* Delete confirmation dialog */}
+      <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete conversation?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will permanently delete this conversation and all its messages. This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleDeleteConversation}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {deleteConversation.isPending ? (
+                <Loader2 className="w-4 h-4 animate-spin mr-2" />
+              ) : null}
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

@@ -105,10 +105,40 @@ export function useConversations() {
     },
   });
 
+  const deleteConversation = useMutation({
+    mutationFn: async (conversationId: string) => {
+      if (!user) throw new Error('Not authenticated');
+
+      // Delete messages first
+      await supabase
+        .from('messages')
+        .delete()
+        .eq('conversation_id', conversationId);
+
+      // Delete participants
+      await supabase
+        .from('conversation_participants')
+        .delete()
+        .eq('conversation_id', conversationId);
+
+      // Delete conversation
+      const { error } = await supabase
+        .from('conversations')
+        .delete()
+        .eq('id', conversationId);
+
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['conversations'] });
+    },
+  });
+
   return {
     conversations: query.data || [],
     isLoading: query.isLoading,
     error: query.error,
     createConversation,
+    deleteConversation,
   };
 }
