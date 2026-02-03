@@ -6,8 +6,8 @@ interface AuthContextType {
   user: User | null;
   session: Session | null;
   loading: boolean;
-  signUp: (email: string, password: string) => Promise<{ error: Error | null }>;
-  signIn: (email: string, password: string) => Promise<{ error: Error | null }>;
+  signUp: (username: string, password: string) => Promise<{ error: Error | null }>;
+  signIn: (username: string, password: string) => Promise<{ error: Error | null }>;
   signOut: () => Promise<void>;
 }
 
@@ -38,18 +38,49 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return () => subscription.unsubscribe();
   }, []);
 
-  const signUp = async (email: string, password: string) => {
-    const { error } = await supabase.auth.signUp({
+  const signUp = async (username: string, password: string) => {
+    // Check if username is already taken
+    const { data: existingUser } = await supabase
+      .from('profiles')
+      .select('username')
+      .eq('username', username.toLowerCase())
+      .maybeSingle();
+
+    if (existingUser) {
+      return { error: new Error('Username is already taken') };
+    }
+
+    // Create user with a generated email (username@echosecure.local)
+    const email = `${username.toLowerCase()}@echosecure.local`;
+    const { data, error } = await supabase.auth.signUp({
       email,
       password,
       options: {
-        emailRedirectTo: window.location.origin,
+        data: {
+          username: username.toLowerCase(),
+        },
       },
     });
-    return { error };
+
+    if (error) return { error };
+
+    // Update the profile with the chosen username
+    if (data.user) {
+      await supabase
+        .from('profiles')
+        .update({ username: username.toLowerCase(), display_name: username })
+        .eq('user_id', data.user.id);
+    }
+
+    // Sign out after signup (user needs to sign in)
+    await supabase.auth.signOut();
+
+    return { error: null };
   };
 
-  const signIn = async (email: string, password: string) => {
+  const signIn = async (username: string, password: string) => {
+    // Convert username to email format
+    const email = `${username.toLowerCase()}@echosecure.local`;
     const { error } = await supabase.auth.signInWithPassword({
       email,
       password,

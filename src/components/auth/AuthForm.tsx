@@ -4,12 +4,12 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Shield, Lock, Mail, Eye, EyeOff, Loader2 } from 'lucide-react';
+import { Shield, Lock, User, Eye, EyeOff, Loader2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 
 export function AuthForm() {
   const [isLogin, setIsLogin] = useState(true);
-  const [email, setEmail] = useState('');
+  const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -22,7 +22,7 @@ export function AuthForm() {
 
     try {
       if (isLogin) {
-        const { error } = await signIn(email, password);
+        const { error } = await signIn(username, password);
         if (error) {
           toast({
             title: 'Sign in failed',
@@ -31,7 +31,16 @@ export function AuthForm() {
           });
         }
       } else {
-        const { error } = await signUp(email, password);
+        if (username.length < 3) {
+          toast({
+            title: 'Invalid username',
+            description: 'Username must be at least 3 characters.',
+            variant: 'destructive',
+          });
+          setLoading(false);
+          return;
+        }
+        const { error } = await signUp(username, password);
         if (error) {
           toast({
             title: 'Sign up failed',
@@ -40,9 +49,11 @@ export function AuthForm() {
           });
         } else {
           toast({
-            title: 'Check your email',
-            description: 'We sent you a confirmation link to verify your account.',
+            title: 'Account created!',
+            description: 'You can now sign in with your username.',
           });
+          setIsLogin(true);
+          setPassword('');
         }
       }
     } finally {
@@ -72,24 +83,25 @@ export function AuthForm() {
             </CardTitle>
             <CardDescription>
               {isLogin
-                ? 'Sign in to access your secure messages'
-                : 'Start messaging with end-to-end encryption'}
+                ? 'Sign in with your username'
+                : 'Choose a username to get started'}
             </CardDescription>
           </CardHeader>
           <CardContent>
             <form onSubmit={handleSubmit} className="space-y-4">
               <div className="space-y-2">
-                <Label htmlFor="email">Email</Label>
+                <Label htmlFor="username">Username</Label>
                 <div className="relative">
-                  <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                  <User className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
                   <Input
-                    id="email"
-                    type="email"
-                    placeholder="you@example.com"
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
+                    id="username"
+                    type="text"
+                    placeholder="your_username"
+                    value={username}
+                    onChange={(e) => setUsername(e.target.value.toLowerCase().replace(/[^a-z0-9_]/g, ''))}
                     className="pl-10"
                     required
+                    minLength={3}
                   />
                 </div>
               </div>
@@ -128,7 +140,7 @@ export function AuthForm() {
                 ) : (
                   <Lock className="w-4 h-4 mr-2" />
                 )}
-                {isLogin ? 'Sign in securely' : 'Create secure account'}
+                {isLogin ? 'Sign in' : 'Create account'}
               </Button>
             </form>
 
