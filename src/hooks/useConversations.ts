@@ -31,30 +31,60 @@ export function useConversations() {
     queryFn: async () => {
       if (!user) return [];
 
-      const { data, error } = await supabase
+      // First get conversations the user participates in
+      const { data: participantData, error: participantError } = await supabase
+        .from('conversation_participants')
+        .select('conversation_id')
+        .eq('user_id', user.id);
+
+      if (participantError) throw participantError;
+
+      const conversationIds = participantData?.map((p) => p.conversation_id) || [];
+      if (conversationIds.length === 0) return [];
+
+      // Get conversations
+      const { data: conversationsData, error: conversationsError } = await supabase
         .from('conversations')
-        .select(`
-          id,
-          created_at,
-          updated_at,
-          conversation_participants (
-            user_id,
-            profiles (
-              id,
-              username,
-              display_name,
-              avatar_url
-            )
-          )
-        `)
+        .select('id, created_at, updated_at')
+        .in('id', conversationIds)
         .order('updated_at', { ascending: false });
 
-      if (error) throw error;
+      if (conversationsError) throw conversationsError;
 
-      // Transform the data to match our interface
-      return (data || []).map((conv: any) => ({
+      // Get all participants for these conversations
+      const { data: allParticipants, error: allParticipantsError } = await supabase
+        .from('conversation_participants')
+        .select('conversation_id, user_id')
+        .in('conversation_id', conversationIds);
+
+      if (allParticipantsError) throw allParticipantsError;
+
+      // Get all user profiles
+      const userIds = [...new Set(allParticipants?.map((p) => p.user_id) || [])];
+      const { data: profiles, error: profilesError } = await supabase
+        .from('profiles')
+        .select('id, user_id, username, display_name, avatar_url')
+        .in('user_id', userIds);
+
+      if (profilesError) throw profilesError;
+
+      // Create a map of user_id to profile
+      const profileMap = new Map(profiles?.map((p) => [p.user_id, p]) || []);
+
+      // Combine data
+      return (conversationsData || []).map((conv) => ({
         ...conv,
-        participants: conv.conversation_participants || [],
+        participants: (allParticipants || [])
+          .filter((p) => p.conversation_id === conv.id)
+          .map((p) => ({
+            user_id: p.user_id,
+            profiles: profileMap.get(p.user_id) || {
+              id: '',
+              username: 'Unknown',
+              display_name: null,
+              avatar_url: null,
+            },
+          })),
       })) as Conversation[];
     },
     enabled: !!user,
