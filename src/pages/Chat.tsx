@@ -1,9 +1,12 @@
 import { useState } from 'react';
 import { ConversationList } from '@/components/chat/ConversationList';
 import { ChatView } from '@/components/chat/ChatView';
+import { ProfileSettings } from '@/components/profile/ProfileSettings';
+import { UserSearchDialog } from '@/components/chat/UserSearchDialog';
 import { useAuth } from '@/contexts/AuthContext';
+import { useProfile } from '@/hooks/useProfile';
 import { Button } from '@/components/ui/button';
-import { Avatar, AvatarFallback } from '@/components/ui/avatar';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -11,16 +14,19 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { Shield, LogOut, Settings, Menu, X } from 'lucide-react';
+import { Shield, LogOut, Settings, Menu, X, UserPlus } from 'lucide-react';
 import { useIsMobile } from '@/hooks/use-mobile';
 
 export default function Chat() {
   const { user, signOut } = useAuth();
+  const { profile } = useProfile();
   const [selectedConversation, setSelectedConversation] = useState<string | null>(null);
   const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [profileOpen, setProfileOpen] = useState(false);
+  const [searchOpen, setSearchOpen] = useState(false);
   const isMobile = useIsMobile();
 
-  const handleSelectConversation = (id: string) => {
+  const handleSelectConversation = (id: string | null) => {
     setSelectedConversation(id);
     if (isMobile) {
       setSidebarOpen(false);
@@ -50,33 +56,47 @@ export default function Chat() {
           </div>
         </div>
 
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button variant="ghost" className="h-8 w-8 rounded-full p-0">
-              <Avatar className="h-8 w-8">
-                <AvatarFallback className="bg-secondary text-xs">
-                  {user?.email?.[0].toUpperCase()}
-                </AvatarFallback>
-              </Avatar>
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end" className="w-56">
-            <div className="px-2 py-1.5">
-              <p className="text-sm font-medium">{user?.email}</p>
-              <p className="text-xs text-muted-foreground">Secured account</p>
-            </div>
-            <DropdownMenuSeparator />
-            <DropdownMenuItem>
-              <Settings className="w-4 h-4 mr-2" />
-              Settings
-            </DropdownMenuItem>
-            <DropdownMenuSeparator />
-            <DropdownMenuItem onClick={() => signOut()} className="text-destructive">
-              <LogOut className="w-4 h-4 mr-2" />
-              Sign out
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
+        <div className="flex items-center gap-2">
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-8 w-8"
+            onClick={() => setSearchOpen(true)}
+          >
+            <UserPlus className="w-4 h-4" />
+          </Button>
+
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="ghost" className="h-8 w-8 rounded-full p-0">
+                <Avatar className="h-8 w-8">
+                  <AvatarImage src={profile?.avatar_url || undefined} />
+                  <AvatarFallback className="bg-secondary text-xs">
+                    {profile?.display_name?.[0] || profile?.username?.[0] || user?.email?.[0]?.toUpperCase()}
+                  </AvatarFallback>
+                </Avatar>
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-56">
+              <div className="px-2 py-1.5">
+                <p className="text-sm font-medium">
+                  {profile?.display_name || profile?.username}
+                </p>
+                <p className="text-xs text-muted-foreground">@{profile?.username}</p>
+              </div>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem onClick={() => setProfileOpen(true)}>
+                <Settings className="w-4 h-4 mr-2" />
+                Settings
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem onClick={() => signOut()} className="text-destructive">
+                <LogOut className="w-4 h-4 mr-2" />
+                Sign out
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </div>
       </header>
 
       {/* Main content */}
@@ -110,6 +130,14 @@ export default function Chat() {
           <ChatView conversationId={selectedConversation} />
         </div>
       </div>
+
+      {/* Dialogs */}
+      <ProfileSettings open={profileOpen} onOpenChange={setProfileOpen} />
+      <UserSearchDialog
+        open={searchOpen}
+        onOpenChange={setSearchOpen}
+        onConversationCreated={handleSelectConversation}
+      />
     </div>
   );
 }

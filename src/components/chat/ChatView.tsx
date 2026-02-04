@@ -1,11 +1,13 @@
 import { useState, useRef, useEffect } from 'react';
 import { useMessages } from '@/hooks/useMessages';
 import { useConversations } from '@/hooks/useConversations';
+import { useTypingIndicator } from '@/hooks/useTypingIndicator';
 import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Avatar, AvatarFallback } from '@/components/ui/avatar';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { TypingIndicator } from '@/components/chat/TypingIndicator';
 import { Shield, Send, Lock, Loader2 } from 'lucide-react';
 import { format } from 'date-fns';
 
@@ -17,6 +19,7 @@ export function ChatView({ conversationId }: ChatViewProps) {
   const { user } = useAuth();
   const { messages, isLoading, sendMessage, isEncryptionReady } = useMessages(conversationId);
   const { conversations } = useConversations();
+  const { otherUserTyping, setTyping } = useTypingIndicator(conversationId);
   const [newMessage, setNewMessage] = useState('');
   const scrollRef = useRef<HTMLDivElement>(null);
 
@@ -25,21 +28,31 @@ export function ChatView({ conversationId }: ChatViewProps) {
     (p) => p.user_id !== user?.id
   )?.profiles;
 
-  // Auto-scroll to bottom on new messages
+  // Auto-scroll to bottom on new messages or typing
   useEffect(() => {
     if (scrollRef.current) {
       scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
     }
-  }, [messages]);
+  }, [messages, otherUserTyping]);
 
   const handleSend = async () => {
     if (!newMessage.trim() || sendMessage.isPending) return;
 
     try {
+      setTyping(false);
       await sendMessage.mutateAsync(newMessage.trim());
       setNewMessage('');
     } catch (error) {
       console.error('Failed to send message:', error);
+    }
+  };
+
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setNewMessage(e.target.value);
+    if (e.target.value.trim()) {
+      setTyping(true);
+    } else {
+      setTyping(false);
     }
   };
 
@@ -71,6 +84,7 @@ export function ChatView({ conversationId }: ChatViewProps) {
       {/* Header */}
       <div className="p-4 border-b border-border flex items-center gap-3 bg-card">
         <Avatar className="h-10 w-10">
+          <AvatarImage src={otherParticipant?.avatar_url || undefined} />
           <AvatarFallback className="gradient-secure text-primary-foreground">
             {otherParticipant?.display_name?.[0] || otherParticipant?.username?.[0] || '?'}
           </AvatarFallback>
@@ -131,6 +145,9 @@ export function ChatView({ conversationId }: ChatViewProps) {
                 </div>
               );
             })}
+            {otherUserTyping && (
+              <TypingIndicator username={otherParticipant?.display_name || otherParticipant?.username} />
+            )}
           </div>
         )}
       </ScrollArea>
@@ -141,7 +158,7 @@ export function ChatView({ conversationId }: ChatViewProps) {
           <Input
             placeholder="Type a message..."
             value={newMessage}
-            onChange={(e) => setNewMessage(e.target.value)}
+            onChange={handleInputChange}
             onKeyPress={handleKeyPress}
             disabled={!isEncryptionReady}
             className="flex-1"
