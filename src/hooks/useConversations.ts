@@ -104,31 +104,32 @@ export function useConversations() {
       if (profileError) throw profileError;
       if (!profile) throw new Error('User not found');
 
-      // Create the conversation
-      const { data: conversation, error: convError } = await supabase
-        .from('conversations')
-        .insert({})
-        .select()
-        .single();
+      // Generate a conversation ID first
+      const conversationId = crypto.randomUUID();
 
-      if (convError) throw convError;
-
-      // Add both participants
+      // Add both participants first (so RLS will allow conversation access)
       const { error: partError } = await supabase
         .from('conversation_participants')
         .insert([
-          { conversation_id: conversation.id, user_id: user.id },
-          { conversation_id: conversation.id, user_id: profile.user_id },
+          { conversation_id: conversationId, user_id: user.id },
+          { conversation_id: conversationId, user_id: profile.user_id },
         ]);
 
       if (partError) throw partError;
 
+      // Create the conversation with the same ID
+      const { error: convError } = await supabase
+        .from('conversations')
+        .insert({ id: conversationId });
+
+      if (convError) throw convError;
+
       // Generate and store encryption key for this conversation
       const key = await generateKey();
       const keyString = await exportKey(key);
-      storeConversationKey(conversation.id, keyString);
+      storeConversationKey(conversationId, keyString);
 
-      return conversation;
+      return { id: conversationId };
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['conversations'] });
