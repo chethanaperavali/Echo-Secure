@@ -4,7 +4,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Avatar, AvatarFallback } from '@/components/ui/avatar';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import {
   Dialog,
   DialogContent,
@@ -197,6 +197,7 @@ export function ConversationList({
                     className="flex-1 flex items-center gap-3 p-3 text-left"
                   >
                     <Avatar className="h-10 w-10">
+                      <AvatarImage src={other.avatar_url || undefined} />
                       <AvatarFallback className={isSelected ? 'gradient-secure text-primary-foreground' : 'bg-secondary'}>
                         {other.display_name?.[0] || other.username[0]}
                       </AvatarFallback>
