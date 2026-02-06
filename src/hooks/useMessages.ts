@@ -19,6 +19,7 @@ interface Message {
   encrypted_content: string;
   iv: string;
   created_at: string;
+  edited_at: string | null;
   decrypted_content?: string;
 }
 
