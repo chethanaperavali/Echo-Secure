@@ -32,15 +32,7 @@ export function useMessages(conversationId: string | null) {
     async function initKey() {
       if (!conversationId) return;
 
-      // First check localStorage cache
-      const cachedKey = getConversationKey(conversationId);
-      if (cachedKey) {
-        const key = await importKey(cachedKey);
-        setEncryptionKey(key);
-        return;
-      }
-
-      // Fetch from database
+      // Always check the database first for the shared key
       const { data } = await supabase
         .from('conversations')
         .select('encryption_key')
@@ -53,14 +45,25 @@ export function useMessages(conversationId: string | null) {
         const key = await importKey(data.encryption_key);
         setEncryptionKey(key);
       } else {
-        // Generate a new key and store it in the database
-        const key = await generateKey();
-        const keyString = await exportKey(key);
+        // No key in DB yet — check if we have a local key to promote
+        const cachedKey = getConversationKey(conversationId);
+        let keyString: string;
+
+        if (cachedKey) {
+          keyString = cachedKey;
+        } else {
+          // Generate a brand new key
+          const key = await generateKey();
+          keyString = await exportKey(key);
+        }
+
+        // Store it in the database so both participants share it
         await supabase
           .from('conversations')
           .update({ encryption_key: keyString })
           .eq('id', conversationId);
         storeConversationKey(conversationId, keyString);
+        const key = await importKey(keyString);
         setEncryptionKey(key);
       }
     }
